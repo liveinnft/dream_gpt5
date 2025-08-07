@@ -1,0 +1,11 @@
+/.gradle/
+/build/
+app/build/
+**/build/
+**/.idea/
+**/.iml
+/local.properties
+.DS_Store
+
+# Secrets
+app/src/main/assets/openrouter_key.txt
