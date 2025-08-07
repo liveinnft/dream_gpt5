@@ -20,6 +20,10 @@ data class Dream(
     val tone: String = "", // e.g., calm/anxious
     val confidence: Float = 0f,
 
+    // UX fields
+    val isFavorite: Boolean = false,
+    val tags: String = "",
+
     // Raw JSON for future use
     val analysisJson: String = ""
 )

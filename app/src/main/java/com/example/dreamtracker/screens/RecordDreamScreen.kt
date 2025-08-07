@@ -41,6 +41,7 @@ fun RecordDreamScreen(onBack: () -> Unit) {
     val repo = remember { DreamRepository(context) }
 
     val titleState = remember { mutableStateOf("") }
+    val tagsState = remember { mutableStateOf("") }
     val transcriptState = remember { mutableStateOf("") }
     val moodState = remember { mutableStateOf(3f) }
 
@@ -75,6 +76,15 @@ fun RecordDreamScreen(onBack: () -> Unit) {
             value = titleState.value,
             onValueChange = { titleState.value = it },
             label = { Text("Название (необязательно)") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = tagsState.value,
+            onValueChange = { tagsState.value = it },
+            label = { Text("Теги (через запятую)") },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -148,7 +158,8 @@ fun RecordDreamScreen(onBack: () -> Unit) {
                             recordedFile.value?.absolutePath,
                             transcriptState.value,
                             title = titleState.value,
-                            moodScore = moodState.value.toInt()
+                            moodScore = moodState.value.toInt(),
+                            tags = tagsState.value
                         )
                         status.value = "Сохранено (#${'$'}id). Анализ готов."
                         onBack()

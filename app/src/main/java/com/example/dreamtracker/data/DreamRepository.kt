@@ -40,7 +40,8 @@ class DreamRepository(private val context: Context) {
         audioFilePath: String?,
         transcriptText: String,
         title: String = "",
-        moodScore: Int = 3
+        moodScore: Int = 3,
+        tags: String = ""
     ): Long {
         val clippedTranscript = transcriptText.take(4000)
         val symbols = extractSymbols(clippedTranscript)
@@ -56,9 +57,27 @@ class DreamRepository(private val context: Context) {
             recommendations = llm?.recommendations?.joinToString("\n") { it.take(200) }?.take(400) ?: "",
             tone = llm?.tone?.take(40) ?: "",
             confidence = llm?.confidence ?: 0f,
+            tags = tags.take(120),
             analysisJson = serializeJson(llm)
         )
         return dao.upsert(dream)
+    }
+
+    suspend fun updateDream(updated: Dream) {
+        dao.update(updated.copy(
+            title = updated.title.take(80),
+            transcriptText = updated.transcriptText.take(4000),
+            tags = updated.tags.take(120)
+        ))
+    }
+
+    suspend fun toggleFavorite(id: Long) {
+        val d = dao.getById(id) ?: return
+        dao.update(d.copy(isFavorite = !d.isFavorite))
+    }
+
+    suspend fun deleteDream(id: Long) {
+        dao.deleteById(id)
     }
 
     private fun serializeJson(llm: LlmAnalysis?): String =
