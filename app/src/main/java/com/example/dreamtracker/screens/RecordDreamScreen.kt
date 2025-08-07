@@ -3,6 +3,7 @@ package com.example.dreamtracker.screens
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.os.Build
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,12 +57,20 @@ fun RecordDreamScreen(onBack: () -> Unit) {
         }
     }
 
+    val notificationsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
+
     val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val data = result.data
             val matches = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             val text = matches?.firstOrNull()
             if (!text.isNullOrBlank()) transcriptState.value = text
+        }
+    }
+
+    fun requestNotificationsIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationsPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -150,6 +159,7 @@ fun RecordDreamScreen(onBack: () -> Unit) {
 
         Button(
             onClick = {
+                requestNotificationsIfNeeded()
                 saving.value = true
                 status.value = "Сохраняю и анализирую..."
                 CoroutineScope(Dispatchers.IO).launch {

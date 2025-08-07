@@ -1,5 +1,6 @@
 package com.example.dreamtracker.screens
 
+import android.app.TimePickerDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,11 +16,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -27,8 +31,8 @@ import androidx.compose.ui.unit.dp
 import com.example.dreamtracker.data.AppDatabase
 import com.example.dreamtracker.data.Dream
 import com.example.dreamtracker.data.DreamRepository
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import com.example.dreamtracker.notifications.ReminderScheduler
+import java.util.Calendar
 
 @Composable
 fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
@@ -37,15 +41,20 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
     val repo = remember { DreamRepository(context) }
     val dreams = dao.observeAll().collectAsState(initial = emptyList())
 
-    val queryState = remember { mutableStateOf("") }
-    val favoritesOnly = remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var favoritesOnly by remember { mutableStateOf(false) }
+
+    // Reminder state (simple in-memory; can be moved to DataStore)
+    var remindersOn by remember { mutableStateOf(false) }
+    var hour by remember { mutableStateOf(9) }
+    var minute by remember { mutableStateOf(0) }
 
     val filtered = dreams.value.filter { d ->
-        val matchQuery = queryState.value.isBlank() ||
-            d.title.contains(queryState.value, true) ||
-            d.transcriptText.contains(queryState.value, true) ||
-            d.tags.contains(queryState.value, true)
-        val matchFav = !favoritesOnly.value || d.isFavorite
+        val matchQuery = query.isBlank() ||
+            d.title.contains(query, true) ||
+            d.transcriptText.contains(query, true) ||
+            d.tags.contains(query, true)
+        val matchFav = !favoritesOnly || d.isFavorite
         matchQuery && matchFav
     }
 
@@ -56,18 +65,35 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
         }
 
         OutlinedTextField(
-            value = queryState.value,
-            onValueChange = { queryState.value = it },
+            value = query,
+            onValueChange = { query = it },
             label = { Text("Поиск (название, текст, теги)") },
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
         )
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            IconButton(onClick = { favoritesOnly.value = !favoritesOnly.value }) {
-                Icon(
-                    painter = painterResource(id = if (favoritesOnly.value) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off),
-                    contentDescription = "Фильтр избранного"
-                )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row {
+                IconButton(onClick = { favoritesOnly = !favoritesOnly }) {
+                    Icon(
+                        painter = painterResource(id = if (favoritesOnly) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off),
+                        contentDescription = "Фильтр избранного"
+                    )
+                }
+                Text(if (favoritesOnly) "Избранное" else "Все")
+            }
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text("Напоминание: ")
+                Switch(checked = remindersOn, onCheckedChange = {
+                    remindersOn = it
+                    if (it) ReminderScheduler.scheduleDaily(context, hour, minute) else ReminderScheduler.cancel(context)
+                })
+                Button(onClick = {
+                    val now = Calendar.getInstance()
+                    TimePickerDialog(context, { _, h, m ->
+                        hour = h; minute = m
+                        if (remindersOn) ReminderScheduler.scheduleDaily(context, hour, minute)
+                    }, hour, minute, true).show()
+                }) { Text(String.format("%02d:%02d", hour, minute)) }
             }
         }
 
@@ -75,7 +101,7 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
             items(filtered) { dream ->
                 DreamItem(dream,
                     onClick = { onOpen(dream.id) },
-                    onToggleFavorite = { GlobalScope.launch { repo.toggleFavorite(dream.id) } }
+                    onToggleFavorite = { kotlinx.coroutines.GlobalScope.launch { repo.toggleFavorite(dream.id) } }
                 )
             }
         }
