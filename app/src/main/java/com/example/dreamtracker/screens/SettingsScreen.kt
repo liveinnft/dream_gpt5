@@ -41,6 +41,8 @@ fun SettingsScreen(onBack: () -> Unit) {
 
     val currentModel = settings.modelFlow.collectAsState(initial = OpenRouterService.DEFAULT_MODEL)
     val demoRemain = settings.demoUsesFlow.collectAsState(initial = 0)
+    val keyValid = settings.keyValidFlow.collectAsState(initial = false)
+    val validationMsg = settings.validationMsgFlow.collectAsState(initial = "")
 
     var keyState by remember { mutableStateOf("") }
     var modelState by remember { mutableStateOf(currentModel.value) }
@@ -51,6 +53,29 @@ fun SettingsScreen(onBack: () -> Unit) {
     fun openUrl(url: String) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
         context.startActivity(intent)
+    }
+
+    fun validateAsync(key: String?, model: String) {
+        status = "Проверка..."
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val service = OpenRouterService.create(key)
+                val req = ChatCompletionRequest(
+                    model = model,
+                    messages = listOf(
+                        ChatMessage("system", "Скажи ‘ok’. Ответ строго: ok"),
+                        ChatMessage("user", "ping")
+                    )
+                )
+                val resp = service.createCompletion(req)
+                val ok = resp.choices.firstOrNull()?.message?.content?.trim()?.lowercase() == "ok"
+                settings.setValidation(ok, if (ok) "Ключ/модель валидны" else "Ответ некорректен (проверьте модель/ключ)")
+                status = validationMsg.value
+            } catch (e: Exception) {
+                settings.setValidation(false, e.message ?: "Ошибка валидации")
+                status = "Ошибка: ${'$'}{e.message}"
+            }
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -67,29 +92,14 @@ fun SettingsScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth()
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { CoroutineScope(Dispatchers.IO).launch { settings.saveApiKeyToFile(keyState) } }) { Text("Сохранить ключ") }
             Button(onClick = {
-                status = "Проверка..."
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        val service = OpenRouterService.create(keyState)
-                        val req = ChatCompletionRequest(
-                            model = currentModel.value,
-                            messages = listOf(
-                                ChatMessage("system", "Скажи ‘ok’. Ответ строго: ok"),
-                                ChatMessage("user", "ping")
-                            )
-                        )
-                        val resp = service.createCompletion(req)
-                        val ok = resp.choices.firstOrNull()?.message?.content?.trim()?.lowercase() == "ok"
-                        status = if (ok) "Ключ валиден" else "Ответ некорректен (проверьте модель/ключ)"
-                    } catch (e: Exception) {
-                        status = "Ошибка: ${'$'}{e.message}"
-                    }
-                }
-            }) { Text("Проверить ключ") }
+                CoroutineScope(Dispatchers.IO).launch { settings.saveApiKeyToFile(keyState) }
+                validateAsync(keyState, currentModel.value)
+            }) { Text("Сохранить ключ и проверить") }
         }
         if (status.isNotBlank()) Text(status)
+        if (validationMsg.value.isNotBlank()) Text(validationMsg.value)
+        Text(if (keyValid.value) "Ключ валиден" else "Ключ не проверен/недействителен")
 
         Text("\nВыбор модели")
         OutlinedTextField(
@@ -99,7 +109,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth()
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { CoroutineScope(Dispatchers.IO).launch { settings.setModel(modelState) } }) { Text("Сохранить модель") }
+            Button(onClick = {
+                CoroutineScope(Dispatchers.IO).launch { settings.setModel(modelState) }
+                validateAsync(keyState.ifBlank { null }, modelState)
+            }) { Text("Сохранить модель и проверить") }
             Button(onClick = {
                 status = "Загрузка моделей..."
                 CoroutineScope(Dispatchers.IO).launch {
