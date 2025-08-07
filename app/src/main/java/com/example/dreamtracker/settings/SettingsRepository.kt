@@ -27,6 +27,11 @@ class SettingsRepository(private val context: Context) {
         private val KEY_VALIDATION_MSG = stringPreferencesKey("validation_msg")
 
         private val KEY_ONBOARDED = booleanPreferencesKey("onboarded")
+
+        private val KEY_DRAFT_TITLE = stringPreferencesKey("draft_title")
+        private val KEY_DRAFT_TAGS = stringPreferencesKey("draft_tags")
+        private val KEY_DRAFT_TEXT = stringPreferencesKey("draft_text")
+        private val KEY_DRAFT_MOOD = intPreferencesKey("draft_mood")
     }
 
     val modelFlow: Flow<String> = context.dataStore.data.map { it[KEY_MODEL] ?: com.example.dreamtracker.network.OpenRouterService.DEFAULT_MODEL }
@@ -50,6 +55,17 @@ class SettingsRepository(private val context: Context) {
 
     val onboardedFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_ONBOARDED] ?: false }
     suspend fun setOnboarded(value: Boolean) { context.dataStore.edit { it[KEY_ONBOARDED] = value } }
+
+    // Draft
+    val draftTitleFlow: Flow<String> = context.dataStore.data.map { it[KEY_DRAFT_TITLE] ?: "" }
+    val draftTagsFlow: Flow<String> = context.dataStore.data.map { it[KEY_DRAFT_TAGS] ?: "" }
+    val draftTextFlow: Flow<String> = context.dataStore.data.map { it[KEY_DRAFT_TEXT] ?: "" }
+    val draftMoodFlow: Flow<Int> = context.dataStore.data.map { it[KEY_DRAFT_MOOD] ?: 3 }
+    suspend fun setDraftTitle(value: String) { context.dataStore.edit { it[KEY_DRAFT_TITLE] = value } }
+    suspend fun setDraftTags(value: String) { context.dataStore.edit { it[KEY_DRAFT_TAGS] = value } }
+    suspend fun setDraftText(value: String) { context.dataStore.edit { it[KEY_DRAFT_TEXT] = value } }
+    suspend fun setDraftMood(value: Int) { context.dataStore.edit { it[KEY_DRAFT_MOOD] = value } }
+    suspend fun clearDraft() { context.dataStore.edit { it.remove(KEY_DRAFT_TITLE); it.remove(KEY_DRAFT_TAGS); it.remove(KEY_DRAFT_TEXT); it.remove(KEY_DRAFT_MOOD) } }
 
     fun saveApiKeyToFile(key: String) { File(context.filesDir, "openrouter_key.txt").writeText(key.trim()) }
 }

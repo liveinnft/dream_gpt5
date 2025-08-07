@@ -1,6 +1,9 @@
 package com.example.dreamtracker.screens
 
 import android.app.TimePickerDialog
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.example.dreamtracker.data.AppDatabase
 import com.example.dreamtracker.data.Dream
 import com.example.dreamtracker.data.DreamRepository
+import com.example.dreamtracker.export.ExportImportManager
 import com.example.dreamtracker.notifications.ReminderScheduler
 import com.example.dreamtracker.settings.SettingsRepository
 import kotlinx.coroutines.GlobalScope
@@ -44,6 +48,7 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
     val dao = remember { AppDatabase.get(context).dreamDao() }
     val repo = remember { DreamRepository(context) }
     val settings = remember { SettingsRepository(context) }
+    val exportManager = remember { ExportImportManager(context) }
     val dreams = dao.observeAll().collectAsState(initial = emptyList())
 
     var query by remember { mutableStateOf("") }
@@ -52,6 +57,17 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
     val remindersOn = settings.reminderOnFlow.collectAsState(initial = false)
     val hour = settings.reminderHourFlow.collectAsState(initial = 9)
     val minute = settings.reminderMinFlow.collectAsState(initial = 0)
+
+    val openDoc = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            GlobalScope.launch {
+                val input = context.contentResolver.openInputStream(uri) ?: return@launch
+                val temp = kotlin.io.path.createTempFile().toFile()
+                temp.outputStream().use { out -> input.copyTo(out) }
+                exportManager.importFromFile(temp)
+            }
+        }
+    }
 
     val filtered = dreams.value.filter { d ->
         val matchQuery = query.isBlank() ||
@@ -63,9 +79,7 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        // Primary CTA
         Button(onClick = onAddNew, modifier = Modifier.fillMaxWidth()) { Text("Записать сон") }
-
         Spacer(Modifier.height(12.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -104,6 +118,17 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
                     }, hour.value, minute.value, true).show()
                 }) { Text(String.format("%02d:%02d", hour.value, minute.value)) }
             }
+        }
+
+        // Export/Import/Share
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Button(onClick = {
+                GlobalScope.launch {
+                    val file = exportManager.exportToFile()
+                    exportManager.shareFile(file)
+                }
+            }) { Text("Экспорт/Поделиться") }
+            Button(onClick = { openDoc.launch(arrayOf("application/json")) }) { Text("Импорт JSON") }
         }
 
         LazyColumn(modifier = Modifier.fillMaxSize()) {

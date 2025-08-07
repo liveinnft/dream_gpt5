@@ -23,6 +23,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -30,9 +31,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.dreamtracker.data.DreamRepository
 import com.example.dreamtracker.feature.recording.AudioRecorder
+import com.example.dreamtracker.settings.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
@@ -40,6 +44,7 @@ fun RecordDreamScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val audioRecorder = remember { AudioRecorder(context) }
     val repo = remember { DreamRepository(context) }
+    val settings = remember { SettingsRepository(context) }
 
     val titleState = remember { mutableStateOf("") }
     val tagsState = remember { mutableStateOf("") }
@@ -72,6 +77,30 @@ fun RecordDreamScreen(onBack: () -> Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationsPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    // Load draft
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            titleState.value = settings.draftTitleFlow.first()
+            tagsState.value = settings.draftTagsFlow.first()
+            transcriptState.value = settings.draftTextFlow.first()
+            moodState.value = settings.draftMoodFlow.first().toFloat()
+        }
+    }
+
+    // Persist draft on change
+    LaunchedEffect(titleState.value) {
+        CoroutineScope(Dispatchers.IO).launch { settings.setDraftTitle(titleState.value) }
+    }
+    LaunchedEffect(tagsState.value) {
+        CoroutineScope(Dispatchers.IO).launch { settings.setDraftTags(tagsState.value) }
+    }
+    LaunchedEffect(transcriptState.value) {
+        CoroutineScope(Dispatchers.IO).launch { settings.setDraftText(transcriptState.value) }
+    }
+    LaunchedEffect(moodState.value) {
+        CoroutineScope(Dispatchers.IO).launch { settings.setDraftMood(moodState.value.toInt()) }
     }
 
     Column(
@@ -171,6 +200,8 @@ fun RecordDreamScreen(onBack: () -> Unit) {
                             moodScore = moodState.value.toInt(),
                             tags = tagsState.value
                         )
+                        // Clear draft on success
+                        settings.clearDraft()
                         status.value = "Сохранено (#${'$'}id). Анализ готов."
                         onBack()
                     } finally {

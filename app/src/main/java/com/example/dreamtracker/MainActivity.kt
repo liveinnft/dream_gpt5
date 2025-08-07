@@ -25,6 +25,7 @@ import com.example.dreamtracker.screens.DreamListScreen
 import com.example.dreamtracker.screens.OnboardingScreen
 import com.example.dreamtracker.screens.RecordDreamScreen
 import com.example.dreamtracker.screens.SettingsScreen
+import com.example.dreamtracker.screens.StatsScreen
 import com.example.dreamtracker.settings.SettingsRepository
 import com.example.dreamtracker.ui.theme.DreamTrackerTheme
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +54,12 @@ class MainActivity : ComponentActivity() {
                         TopAppBar(
                             title = { Text("DreamTracker") },
                             actions = {
+                                IconButton(onClick = { navController.navigate("stats") }) {
+                                    Icon(
+                                        painter = painterResource(id = android.R.drawable.ic_menu_agenda),
+                                        contentDescription = "Статистика"
+                                    )
+                                }
                                 IconButton(onClick = { navController.navigate("settings") }) {
                                     Icon(
                                         painter = painterResource(id = android.R.drawable.ic_menu_manage),
@@ -102,6 +109,9 @@ fun AppNavHost(navController: NavHostController, onFinishOnboarding: () -> Unit)
         }
         composable("settings") {
             SettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable("stats") {
+            StatsScreen()
         }
     }
 }
