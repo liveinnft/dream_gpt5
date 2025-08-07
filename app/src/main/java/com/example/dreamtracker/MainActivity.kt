@@ -3,6 +3,7 @@ package com.example.dreamtracker
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -17,8 +18,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
+import com.google.accompanist.navigation.animation.AnimatedNavHost
+import com.google.accompanist.navigation.animation.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.dreamtracker.screens.DreamDetailScreen
 import com.example.dreamtracker.screens.DreamListScreen
@@ -41,12 +42,6 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             val settings = remember { SettingsRepository(applicationContext) }
             val scope = rememberCoroutineScope()
-            var startDestination by remember { mutableStateOf("list") }
-
-            LaunchedEffect(Unit) {
-                val onboarded = withContext(Dispatchers.IO) { settings.onboardedFlow.firstOrNull() ?: false }
-                startDestination = if (onboarded) "list" else "onboarding"
-            }
 
             DreamTrackerTheme(darkTheme = darkTheme) {
                 Scaffold(
@@ -87,7 +82,14 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppNavHost(navController: NavHostController, onFinishOnboarding: () -> Unit) {
-    NavHost(navController = navController, startDestination = "list") {
+    AnimatedNavHost(
+        navController = navController,
+        startDestination = "list",
+        enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left) },
+        exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left) },
+        popEnterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right) },
+        popExitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right) }
+    ) {
         composable("onboarding") {
             OnboardingScreen(
                 onStartRecording = { navController.navigate("record") },

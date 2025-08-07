@@ -96,8 +96,9 @@ dependencies {
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Accompanist (permissions)
+    // Accompanist (permissions + navigation animation)
     implementation("com.google.accompanist:accompanist-permissions:0.35.2-alpha")
+    implementation("com.google.accompanist:accompanist-navigation-animation:0.35.2-alpha")
 
     // Test
     testImplementation("junit:junit:4.13.2")
