@@ -32,6 +32,9 @@ import com.example.dreamtracker.data.AppDatabase
 import com.example.dreamtracker.data.Dream
 import com.example.dreamtracker.data.DreamRepository
 import com.example.dreamtracker.notifications.ReminderScheduler
+import com.example.dreamtracker.settings.SettingsRepository
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.util.Calendar
 
 @Composable
@@ -39,15 +42,15 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
     val context = LocalContext.current
     val dao = remember { AppDatabase.get(context).dreamDao() }
     val repo = remember { DreamRepository(context) }
+    val settings = remember { SettingsRepository(context) }
     val dreams = dao.observeAll().collectAsState(initial = emptyList())
 
     var query by remember { mutableStateOf("") }
     var favoritesOnly by remember { mutableStateOf(false) }
 
-    // Reminder state (simple in-memory; can be moved to DataStore)
-    var remindersOn by remember { mutableStateOf(false) }
-    var hour by remember { mutableStateOf(9) }
-    var minute by remember { mutableStateOf(0) }
+    val remindersOn = settings.reminderOnFlow.collectAsState(initial = false)
+    val hour = settings.reminderHourFlow.collectAsState(initial = 9)
+    val minute = settings.reminderMinFlow.collectAsState(initial = 0)
 
     val filtered = dreams.value.filter { d ->
         val matchQuery = query.isBlank() ||
@@ -83,17 +86,18 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
             }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("Напоминание: ")
-                Switch(checked = remindersOn, onCheckedChange = {
-                    remindersOn = it
-                    if (it) ReminderScheduler.scheduleDaily(context, hour, minute) else ReminderScheduler.cancel(context)
+                Switch(checked = remindersOn.value, onCheckedChange = {
+                    GlobalScope.launch {
+                        settings.setReminderOn(it)
+                        if (it) ReminderScheduler.scheduleDaily(context, hour.value, minute.value) else ReminderScheduler.cancel(context)
+                    }
                 })
                 Button(onClick = {
-                    val now = Calendar.getInstance()
                     TimePickerDialog(context, { _, h, m ->
-                        hour = h; minute = m
-                        if (remindersOn) ReminderScheduler.scheduleDaily(context, hour, minute)
-                    }, hour, minute, true).show()
-                }) { Text(String.format("%02d:%02d", hour, minute)) }
+                        GlobalScope.launch { settings.setReminderTime(h, m) }
+                        if (remindersOn.value) ReminderScheduler.scheduleDaily(context, h, m)
+                    }, hour.value, minute.value, true).show()
+                }) { Text(String.format("%02d:%02d", hour.value, minute.value)) }
             }
         }
 
@@ -101,7 +105,7 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
             items(filtered) { dream ->
                 DreamItem(dream,
                     onClick = { onOpen(dream.id) },
-                    onToggleFavorite = { kotlinx.coroutines.GlobalScope.launch { repo.toggleFavorite(dream.id) } }
+                    onToggleFavorite = { GlobalScope.launch { repo.toggleFavorite(dream.id) } }
                 )
             }
         }
