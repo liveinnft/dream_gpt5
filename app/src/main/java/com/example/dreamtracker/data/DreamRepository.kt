@@ -5,6 +5,7 @@ import com.example.dreamtracker.network.ChatCompletionRequest
 import com.example.dreamtracker.network.ChatMessage
 import com.example.dreamtracker.network.OpenRouterService
 import com.example.dreamtracker.secrets.OpenRouterKeyProvider
+import com.example.dreamtracker.settings.SettingsRepository
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
@@ -18,6 +19,7 @@ class DreamRepository(private val context: Context) {
     private val dao by lazy { database.dreamDao() }
 
     private val moshi: Moshi = Moshi.Builder().build()
+    private val settings by lazy { SettingsRepository(context) }
 
     data class SymbolMeaning(
         val symbol: String,
@@ -95,7 +97,13 @@ class DreamRepository(private val context: Context) {
         title: String,
         moodScore: Int
     ): LlmAnalysis? = withContext(Dispatchers.IO) {
-        val key = OpenRouterKeyProvider.readKey(context) ?: return@withContext null
+        var key = OpenRouterKeyProvider.readKey(context)
+        val usingDemo = key == null
+        if (usingDemo && settings.isDemoLimitReached()) {
+            return@withContext null
+        }
+        if (key == null) key = "demo"
+
         val service = OpenRouterService.create(key)
         val systemPrompt = """
             Ты — бережный психолог и интерпретатор сновидений. Возвращай ОТВЕТ СТРОГО в JSON по схеме:
@@ -117,8 +125,9 @@ class DreamRepository(private val context: Context) {
             appendLine("Символы:")
             appendLine(symbols.joinToString(", ").ifEmpty { "(нет)" })
         }
+        val modelId = settings.getModelOrDefault(OpenRouterService.DEFAULT_MODEL)
         val req = ChatCompletionRequest(
-            model = OpenRouterService.DEFAULT_MODEL,
+            model = modelId,
             messages = listOf(
                 ChatMessage(role = "system", content = systemPrompt),
                 ChatMessage(role = "user", content = userPrompt)
@@ -126,6 +135,8 @@ class DreamRepository(private val context: Context) {
         )
         val resp = service.createCompletion(req)
         val content = resp.choices.firstOrNull()?.message?.content ?: return@withContext null
+
+        if (usingDemo) settings.incrementDemoUse()
         parseLlmJson(content)
     }
 

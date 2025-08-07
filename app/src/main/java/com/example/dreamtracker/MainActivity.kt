@@ -21,6 +21,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.dreamtracker.screens.DreamDetailScreen
 import com.example.dreamtracker.screens.DreamListScreen
 import com.example.dreamtracker.screens.RecordDreamScreen
+import com.example.dreamtracker.screens.SettingsScreen
 import com.example.dreamtracker.ui.theme.DreamTrackerTheme
 
 class MainActivity : ComponentActivity() {
@@ -37,10 +38,16 @@ class MainActivity : ComponentActivity() {
                         TopAppBar(
                             title = { Text("DreamTracker") },
                             actions = {
+                                IconButton(onClick = { navController.navigate("settings") }) {
+                                    Icon(
+                                        painter = painterResource(id = android.R.drawable.ic_menu_manage),
+                                        contentDescription = "Настройки"
+                                    )
+                                }
                                 IconButton(onClick = { darkTheme = !darkTheme }) {
                                     Icon(
                                         painter = painterResource(id = android.R.drawable.ic_menu_day),
-                                        contentDescription = "Toggle theme"
+                                        contentDescription = "Переключить тему"
                                     )
                                 }
                             }
@@ -69,6 +76,9 @@ fun AppNavHost(navController: NavHostController) {
         composable("detail/{id}") { backStackEntry ->
             val idArg = backStackEntry.arguments?.getString("id")?.toLongOrNull()
             DreamDetailScreen(dreamId = idArg, onBack = { navController.popBackStack() })
+        }
+        composable("settings") {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }
