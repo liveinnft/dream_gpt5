@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import com.example.dreamtracker.data.AppDatabase
 import com.example.dreamtracker.data.Dream
 import com.example.dreamtracker.export.ReportGenerator
@@ -27,6 +26,7 @@ import com.example.dreamtracker.ui.charts.BarChart
 import com.example.dreamtracker.ui.charts.PieChart
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -39,6 +39,8 @@ fun StatsScreen() {
     val tones = remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     val topSymbols = remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
     val periodDays = remember { mutableStateOf(7) }
+    val reportTheme = remember { mutableStateOf(ReportGenerator.ReportTheme.LIGHT) }
+    val sharePng = remember { mutableStateOf(false) }
 
     LaunchedEffect(periodDays.value) {
         val now = System.currentTimeMillis()
@@ -49,18 +51,38 @@ fun StatsScreen() {
         topSymbols.value = calcTopSymbols(dreams)
     }
 
+    fun share(file: File, mime: String) {
+        val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(android.content.Intent.createChooser(intent, "Поделиться отчётом"))
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Статистика", style = MaterialTheme.typography.titleLarge)
 
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
             Button(onClick = { periodDays.value = 7 }) { Text("Неделя") }
             Button(onClick = { periodDays.value = 30 }, modifier = Modifier.padding(start = 8.dp)) { Text("Месяц") }
+        }
+
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Button(onClick = { reportTheme.value = ReportGenerator.ReportTheme.LIGHT }) { Text("Светлая тема отчёта") }
+            Button(onClick = { reportTheme.value = ReportGenerator.ReportTheme.DARK }, modifier = Modifier.padding(start = 8.dp)) { Text("Тёмная тема отчёта") }
+        }
+
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Button(onClick = { sharePng.value = false }) { Text("PDF") }
+            Button(onClick = { sharePng.value = true }, modifier = Modifier.padding(start = 8.dp)) { Text("PNG") }
             Button(onClick = {
                 GlobalScope.launch {
-                    val (pdf, png) = ReportGenerator(context).generate(periodDays.value)
-                    // Можно добавить мгновенный шаринг/просмотр; оставим файл в exports
+                    val (pdf, png) = ReportGenerator(context).generate(periodDays.value, reportTheme.value)
+                    if (sharePng.value) share(png, "image/png") else share(pdf, "application/pdf")
                 }
-            }, modifier = Modifier.padding(start = 8.dp)) { Text("Экспорт отчёта") }
+            }, modifier = Modifier.padding(start = 8.dp)) { Text("Экспорт и поделиться") }
         }
 
         AnimatedVisibility(visible = moodByDay.value.isNotEmpty(), enter = fadeIn() + slideInVertically()) {
