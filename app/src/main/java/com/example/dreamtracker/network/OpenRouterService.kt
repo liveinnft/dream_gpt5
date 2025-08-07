@@ -8,6 +8,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
 
@@ -15,6 +16,9 @@ interface OpenRouterService {
     @Headers("Content-Type: application/json")
     @POST("api/v1/chat/completions")
     suspend fun createCompletion(@Body request: ChatCompletionRequest): ChatCompletionResponse
+
+    @GET("api/v1/models")
+    suspend fun listModels(): ModelsResponse
 
     companion object {
         const val BASE_URL = "https://openrouter.ai/"
@@ -67,4 +71,13 @@ data class Choice(
     val index: Int,
     val message: ChatMessage,
     @Json(name = "finish_reason") val finishReason: String?
+)
+
+data class ModelsResponse(
+    val data: List<ModelInfo>?
+)
+
+data class ModelInfo(
+    val id: String,
+    val name: String?
 )
