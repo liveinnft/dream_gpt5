@@ -18,6 +18,9 @@ interface DreamDao {
     @Query("SELECT * FROM dreams WHERE id = :id")
     suspend fun getById(id: Long): Dream?
 
+    @Query("SELECT * FROM dreams WHERE createdAtEpoch BETWEEN :start AND :end ORDER BY createdAtEpoch ASC")
+    suspend fun getBetween(start: Long, end: Long): List<Dream>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(dream: Dream): Long
 

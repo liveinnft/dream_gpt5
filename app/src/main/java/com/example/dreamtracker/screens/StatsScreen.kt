@@ -4,33 +4,46 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.dreamtracker.data.AppDatabase
 import com.example.dreamtracker.data.Dream
+import com.example.dreamtracker.export.ReportGenerator
 import com.example.dreamtracker.ui.charts.BarChart
 import com.example.dreamtracker.ui.charts.PieChart
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
 fun StatsScreen() {
-    val dao = remember { AppDatabase.get(androidx.compose.ui.platform.LocalContext.current).dreamDao() }
+    val context = LocalContext.current
+    val dao = remember { AppDatabase.get(context).dreamDao() }
     val moodByDay = remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     val tones = remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     val topSymbols = remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
+    val periodDays = remember { mutableStateOf(7) }
 
-    LaunchedEffect(Unit) {
-        val dreams = dao.getAll()
+    LaunchedEffect(periodDays.value) {
+        val now = System.currentTimeMillis()
+        val start = now - periodDays.value * 24L * 60L * 60L * 1000L
+        val dreams = dao.getBetween(start, now)
         moodByDay.value = calcMoodByDay(dreams)
         tones.value = calcTones(dreams)
         topSymbols.value = calcTopSymbols(dreams)
@@ -38,6 +51,17 @@ fun StatsScreen() {
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Статистика", style = MaterialTheme.typography.titleLarge)
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { periodDays.value = 7 }) { Text("Неделя") }
+            Button(onClick = { periodDays.value = 30 }, modifier = Modifier.padding(start = 8.dp)) { Text("Месяц") }
+            Button(onClick = {
+                GlobalScope.launch {
+                    val (pdf, png) = ReportGenerator(context).generate(periodDays.value)
+                    // Можно добавить мгновенный шаринг/просмотр; оставим файл в exports
+                }
+            }, modifier = Modifier.padding(start = 8.dp)) { Text("Экспорт отчёта") }
+        }
 
         AnimatedVisibility(visible = moodByDay.value.isNotEmpty(), enter = fadeIn() + slideInVertically()) {
             Column {
@@ -63,7 +87,7 @@ fun StatsScreen() {
 }
 
 private fun calcMoodByDay(dreams: List<Dream>): Map<String, Double> {
-    val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val fmt = SimpleDateFormat("dd.MM", Locale.getDefault())
     val groups = dreams.groupBy { fmt.format(Date(it.createdAtEpoch)) }
     return groups.mapValues { (_, ds) -> ds.map { it.moodScore }.average() }.toSortedMap()
 }
