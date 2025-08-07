@@ -10,8 +10,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavHostController
@@ -20,9 +22,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.dreamtracker.screens.DreamDetailScreen
 import com.example.dreamtracker.screens.DreamListScreen
+import com.example.dreamtracker.screens.OnboardingScreen
 import com.example.dreamtracker.screens.RecordDreamScreen
 import com.example.dreamtracker.screens.SettingsScreen
+import com.example.dreamtracker.settings.SettingsRepository
 import com.example.dreamtracker.ui.theme.DreamTrackerTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,9 +37,17 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var darkTheme by remember { mutableStateOf(isSystemInDarkTheme()) }
-            DreamTrackerTheme(darkTheme = darkTheme) {
-                val navController = rememberNavController()
+            val navController = rememberNavController()
+            val settings = remember { SettingsRepository(applicationContext) }
+            val scope = rememberCoroutineScope()
+            var startDestination by remember { mutableStateOf("list") }
 
+            LaunchedEffect(Unit) {
+                val onboarded = withContext(Dispatchers.IO) { settings.onboardedFlow.firstOrNull() ?: false }
+                startDestination = if (onboarded) "list" else "onboarding"
+            }
+
+            DreamTrackerTheme(darkTheme = darkTheme) {
                 Scaffold(
                     topBar = {
                         TopAppBar(
@@ -54,7 +69,9 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 ) { _ ->
-                    AppNavHost(navController = navController)
+                    AppNavHost(navController = navController, onFinishOnboarding = {
+                        scope.launch { settings.setOnboarded(true); navController.navigate("list") { popUpTo("onboarding") { inclusive = true } } }
+                    })
                 }
             }
         }
@@ -62,8 +79,14 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavHost(navController: NavHostController) {
+fun AppNavHost(navController: NavHostController, onFinishOnboarding: () -> Unit) {
     NavHost(navController = navController, startDestination = "list") {
+        composable("onboarding") {
+            OnboardingScreen(
+                onStartRecording = { navController.navigate("record") },
+                onOpenSettings = { navController.navigate("settings") }
+            )
+        }
         composable("list") {
             DreamListScreen(
                 onAddNew = { navController.navigate("record") },

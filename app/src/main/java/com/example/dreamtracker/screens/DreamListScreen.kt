@@ -5,8 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,7 +37,6 @@ import com.example.dreamtracker.notifications.ReminderScheduler
 import com.example.dreamtracker.settings.SettingsRepository
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 @Composable
 fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
@@ -62,9 +63,13 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        // Primary CTA
+        Button(onClick = onAddNew, modifier = Modifier.fillMaxWidth()) { Text("Записать сон") }
+
+        Spacer(Modifier.height(12.dp))
+
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Сны", style = MaterialTheme.typography.titleLarge)
-            Button(onClick = onAddNew) { Text("Добавить") }
         }
 
         OutlinedTextField(

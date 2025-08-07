@@ -25,6 +25,8 @@ class SettingsRepository(private val context: Context) {
 
         private val KEY_KEY_VALID = booleanPreferencesKey("key_valid")
         private val KEY_VALIDATION_MSG = stringPreferencesKey("validation_msg")
+
+        private val KEY_ONBOARDED = booleanPreferencesKey("onboarded")
     }
 
     val modelFlow: Flow<String> = context.dataStore.data.map { it[KEY_MODEL] ?: com.example.dreamtracker.network.OpenRouterService.DEFAULT_MODEL }
@@ -45,6 +47,9 @@ class SettingsRepository(private val context: Context) {
     val keyValidFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_KEY_VALID] ?: false }
     val validationMsgFlow: Flow<String> = context.dataStore.data.map { it[KEY_VALIDATION_MSG] ?: "" }
     suspend fun setValidation(valid: Boolean, msg: String) { context.dataStore.edit { it[KEY_KEY_VALID] = valid; it[KEY_VALIDATION_MSG] = msg } }
+
+    val onboardedFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_ONBOARDED] ?: false }
+    suspend fun setOnboarded(value: Boolean) { context.dataStore.edit { it[KEY_ONBOARDED] = value } }
 
     fun saveApiKeyToFile(key: String) { File(context.filesDir, "openrouter_key.txt").writeText(key.trim()) }
 }
