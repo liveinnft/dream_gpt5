@@ -4,6 +4,9 @@ import android.app.TimePickerDialog
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -79,7 +83,9 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Button(onClick = onAddNew, modifier = Modifier.fillMaxWidth()) { Text("Записать сон") }
+        AnimatedVisibility(visible = true, enter = fadeIn() + slideInVertically()) {
+            Button(onClick = onAddNew, modifier = Modifier.fillMaxWidth()) { Text("Записать сон") }
+        }
         Spacer(Modifier.height(12.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -120,7 +126,6 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
             }
         }
 
-        // Export/Import/Share
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Button(onClick = {
                 GlobalScope.launch {
@@ -132,11 +137,13 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
         }
 
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(filtered) { dream ->
-                DreamItem(dream,
-                    onClick = { onOpen(dream.id) },
-                    onToggleFavorite = { GlobalScope.launch { repo.toggleFavorite(dream.id) } }
-                )
+            itemsIndexed(filtered, key = { _, item -> item.id }) { index, dream ->
+                AnimatedVisibility(visible = true, enter = fadeIn() + slideInVertically(initialOffsetY = { it / 8 * index.coerceAtMost(8) })) {
+                    DreamItem(dream,
+                        onClick = { onOpen(dream.id) },
+                        onToggleFavorite = { GlobalScope.launch { repo.toggleFavorite(dream.id) } }
+                    )
+                }
             }
         }
     }

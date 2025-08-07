@@ -2,6 +2,12 @@ package com.example.dreamtracker.screens
 
 import android.content.Intent
 import android.media.MediaPlayer
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -106,10 +113,18 @@ fun DreamDetailScreen(dreamId: Long?, onBack: () -> Unit) {
 
                 if (dream.audioFilePath != null) {
                     Spacer(modifier = Modifier.padding(8.dp))
-                    AudioPlayerControl(filePath = dream.audioFilePath)
+                    val pulse = rememberInfiniteTransition(label = "pulse").animateFloat(
+                        initialValue = 0.95f,
+                        targetValue = 1.05f,
+                        animationSpec = infiniteRepeatable(animation = tween(800), repeatMode = RepeatMode.Reverse),
+                        label = "pulse"
+                    )
+                    Column(modifier = Modifier.scale(pulse.value)) {
+                        AudioPlayerControl(filePath = dream.audioFilePath)
+                    }
                 }
 
-                if (dream.summary.isNotBlank()) {
+                AnimatedVisibility(visible = dream.summary.isNotBlank()) {
                     Spacer(modifier = Modifier.padding(8.dp))
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
@@ -118,7 +133,7 @@ fun DreamDetailScreen(dreamId: Long?, onBack: () -> Unit) {
                         }
                     }
                 }
-                if (dream.insights.isNotBlank()) {
+                AnimatedVisibility(visible = dream.insights.isNotBlank()) {
                     Spacer(modifier = Modifier.padding(8.dp))
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
@@ -127,7 +142,7 @@ fun DreamDetailScreen(dreamId: Long?, onBack: () -> Unit) {
                         }
                     }
                 }
-                if (dream.recommendations.isNotBlank()) {
+                AnimatedVisibility(visible = dream.recommendations.isNotBlank()) {
                     Spacer(modifier = Modifier.padding(8.dp))
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
@@ -192,9 +207,7 @@ private fun AudioPlayerControl(filePath: String) {
     }
 
     fun stop() {
-        playerState.value?.apply {
-            stop(); release()
-        }
+        playerState.value?.apply { stop(); release() }
         playerState.value = null
         isPlaying.value = false
     }

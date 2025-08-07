@@ -1,5 +1,8 @@
 package com.example.dreamtracker.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -13,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.dreamtracker.data.AppDatabase
 import com.example.dreamtracker.data.Dream
+import com.example.dreamtracker.ui.charts.BarChart
+import com.example.dreamtracker.ui.charts.PieChart
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,14 +38,27 @@ fun StatsScreen() {
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Статистика", style = MaterialTheme.typography.titleLarge)
-        Text("\nСреднее настроение по дням:")
-        moodByDay.value.forEach { (day, avg) -> Text("${'$'}day: ${'$'}{String.format(Locale.getDefault(), "%.2f", avg)}") }
 
-        Text("\nТональность (распределение):")
-        tones.value.forEach { (tone, count) -> Text("${'$'}tone: ${'$'}count") }
+        AnimatedVisibility(visible = moodByDay.value.isNotEmpty(), enter = fadeIn() + slideInVertically()) {
+            Column {
+                Text("\nСреднее настроение по дням:")
+                BarChart(data = moodByDay.value.map { it.key to it.value.toFloat() })
+            }
+        }
 
-        Text("\nТоп символов:")
-        topSymbols.value.take(10).forEach { (sym, count) -> Text("${'$'}sym: ${'$'}count") }
+        AnimatedVisibility(visible = tones.value.isNotEmpty(), enter = fadeIn() + slideInVertically()) {
+            Column {
+                Text("\nТональность (распределение):")
+                PieChart(data = tones.value.map { it.key to it.value.toFloat() })
+            }
+        }
+
+        AnimatedVisibility(visible = topSymbols.value.isNotEmpty(), enter = fadeIn() + slideInVertically()) {
+            Column {
+                Text("\nТоп символов:")
+                BarChart(data = topSymbols.value.take(8).map { it.first to it.second.toFloat() })
+            }
+        }
     }
 }
 

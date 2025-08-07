@@ -7,6 +7,11 @@ import android.os.Build
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.dreamtracker.data.DreamRepository
@@ -103,6 +109,13 @@ fun RecordDreamScreen(onBack: () -> Unit) {
         CoroutineScope(Dispatchers.IO).launch { settings.setDraftMood(moodState.value.toInt()) }
     }
 
+    val pulse = rememberInfiniteTransition(label = "rec").animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(animation = tween(600), repeatMode = RepeatMode.Reverse),
+        label = "rec"
+    )
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.Top
@@ -158,7 +171,7 @@ fun RecordDreamScreen(onBack: () -> Unit) {
                 isRecording.value = false
                 status.value = "Запись остановлена"
             }
-        }, modifier = Modifier.fillMaxWidth()) {
+        }, modifier = Modifier.fillMaxWidth().let { if (isRecording.value) it.scale(pulse.value) else it }) {
             Text(if (isRecording.value) "Стоп" else "Записать голосом")
         }
 
