@@ -24,22 +24,23 @@ interface OpenRouterService {
         const val BASE_URL = "https://openrouter.ai/"
         const val DEFAULT_MODEL = "openai/gpt-4o-mini"
 
-        fun create(apiKey: String): OpenRouterService {
+        fun create(apiKey: String?): OpenRouterService {
             val logging = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BASIC
             }
-            val authInterceptor = Interceptor { chain ->
-                val req = chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer $apiKey")
-                    .addHeader("HTTP-Referer", "https://example.com")
-                    .addHeader("X-Title", "DreamTracker")
-                    .build()
-                chain.proceed(req)
+            val builder = OkHttpClient.Builder().addInterceptor(logging)
+            if (!apiKey.isNullOrBlank()) {
+                val authInterceptor = Interceptor { chain ->
+                    val req = chain.request().newBuilder()
+                        .addHeader("Authorization", "Bearer $apiKey")
+                        .addHeader("HTTP-Referer", "https://example.com")
+                        .addHeader("X-Title", "DreamTracker")
+                        .build()
+                    chain.proceed(req)
+                }
+                builder.addInterceptor(authInterceptor)
             }
-            val client = OkHttpClient.Builder()
-                .addInterceptor(authInterceptor)
-                .addInterceptor(logging)
-                .build()
+            val client = builder.build()
 
             val moshi = Moshi.Builder().build()
             val retrofit = Retrofit.Builder()
@@ -79,5 +80,11 @@ data class ModelsResponse(
 
 data class ModelInfo(
     val id: String,
-    val name: String?
+    val name: String?,
+    val pricing: Pricing?
+)
+
+data class Pricing(
+    val prompt: Double?,
+    val completion: Double?
 )
