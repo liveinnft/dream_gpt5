@@ -24,31 +24,45 @@ class DreamRepository(private val context: Context) {
         val meaning: String
     )
 
+    data class LlmAnalysis(
+        val summary: String,
+        val insights: List<String>,
+        val recommendations: List<String>,
+        val tone: String,
+        val confidence: Float
+    )
+
     suspend fun observeDreams() = dao.observeAll()
 
     suspend fun getDream(id: Long) = dao.getById(id)
 
     suspend fun saveDream(
         audioFilePath: String?,
-        transcriptText: String
+        transcriptText: String,
+        title: String = "",
+        moodScore: Int = 3
     ): Long {
-        val symbols = extractSymbols(transcriptText)
-        val ruleBased = buildRuleBasedAnalysis(symbols)
-        val llm = runLlmAnalysis(transcriptText, symbols)
-        val combinedAnalysis = buildString {
-            append("Правила: \n")
-            append(ruleBased)
-            append("\n\nНейросеть: \n")
-            append(llm)
-        }
+        val clippedTranscript = transcriptText.take(4000)
+        val symbols = extractSymbols(clippedTranscript)
+        val llm = runLlmAnalysis(clippedTranscript, symbols, title, moodScore)
         val dream = Dream(
             audioFilePath = audioFilePath,
-            transcriptText = transcriptText,
-            symbolsMatched = symbols.joinToString(","),
-            analysisText = combinedAnalysis
+            transcriptText = clippedTranscript,
+            title = title.take(80),
+            moodScore = moodScore.coerceIn(1, 5),
+            summary = llm?.summary?.take(400) ?: "",
+            symbolsMatched = symbols.joinToString(",").take(300),
+            insights = llm?.insights?.joinToString("\n") { it.take(200) }?.take(800) ?: "",
+            recommendations = llm?.recommendations?.joinToString("\n") { it.take(200) }?.take(400) ?: "",
+            tone = llm?.tone?.take(40) ?: "",
+            confidence = llm?.confidence ?: 0f,
+            analysisJson = serializeJson(llm)
         )
         return dao.upsert(dream)
     }
+
+    private fun serializeJson(llm: LlmAnalysis?): String =
+        if (llm == null) "" else moshi.adapter(LlmAnalysis::class.java).toJson(llm)
 
     private suspend fun extractSymbols(text: String): List<String> = withContext(Dispatchers.IO) {
         val list = loadSymbols()
@@ -56,24 +70,28 @@ class DreamRepository(private val context: Context) {
         list.filter { lowered.contains(it.symbol.lowercase()) }.map { it.symbol }
     }
 
-    private suspend fun buildRuleBasedAnalysis(symbols: List<String>): String = withContext(Dispatchers.Default) {
-        if (symbols.isEmpty()) return@withContext "Ярких символов не найдено."
-        val all = loadSymbols().associateBy { it.symbol.lowercase() }
-        symbols.joinToString(separator = "\n") { s ->
-            val m = all[s.lowercase()]?.meaning ?: ""
-            "• $s: $m"
-        }
-    }
-
-    private suspend fun runLlmAnalysis(text: String, symbols: List<String>): String = withContext(Dispatchers.IO) {
-        val key = OpenRouterKeyProvider.readKey(context) ?: return@withContext "Ключ OpenRouter не найден. Добавьте openrouter_key.txt."
+    private suspend fun runLlmAnalysis(
+        text: String,
+        symbols: List<String>,
+        title: String,
+        moodScore: Int
+    ): LlmAnalysis? = withContext(Dispatchers.IO) {
+        val key = OpenRouterKeyProvider.readKey(context) ?: return@withContext null
         val service = OpenRouterService.create(key)
         val systemPrompt = """
-            Ты — внимательный интерпретатор сновидений. Анализируй текст сна кратко и бережно.
-            Учитывай список символов, их возможные значения и эмоциональный тон.
-            Дай 3-5 наблюдений и 1-2 мягких рекомендации для самопомощи.
+            Ты — бережный психолог и интерпретатор сновидений. Возвращай ОТВЕТ СТРОГО в JSON по схеме:
+            {
+              "summary": "краткое резюме (<= 400 символов)",
+              "insights": ["до 3 наблюдений, каждое <= 160"],
+              "recommendations": ["1-2 мягкие рекомендации, каждая <= 160"],
+              "tone": "одно слово о тоне (например: спокойный, тревожный)",
+              "confidence": 0.0..1.0
+            }
+            Никакого текста вне JSON. Никаких комментариев. Только JSON.
         """.trimIndent()
         val userPrompt = buildString {
+            appendLine("Название: ${'$'}title")
+            appendLine("Настроение (1..5): ${'$'}moodScore")
             appendLine("Текст сна:")
             appendLine(text)
             appendLine()
@@ -88,7 +106,17 @@ class DreamRepository(private val context: Context) {
             )
         )
         val resp = service.createCompletion(req)
-        resp.choices.firstOrNull()?.message?.content ?: "Не удалось получить ответ нейросети."
+        val content = resp.choices.firstOrNull()?.message?.content ?: return@withContext null
+        parseLlmJson(content)
+    }
+
+    private fun parseLlmJson(json: String): LlmAnalysis? {
+        return try {
+            val adapter: JsonAdapter<LlmAnalysis> = moshi.adapter(LlmAnalysis::class.java)
+            adapter.fromJson(json)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private suspend fun loadSymbols(): List<SymbolMeaning> = withContext(Dispatchers.IO) {

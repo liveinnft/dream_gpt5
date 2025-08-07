@@ -3,23 +3,25 @@ package com.example.dreamtracker.screens
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
-import android.os.Bundle
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -38,10 +40,14 @@ fun RecordDreamScreen(onBack: () -> Unit) {
     val audioRecorder = remember { AudioRecorder(context) }
     val repo = remember { DreamRepository(context) }
 
+    val titleState = remember { mutableStateOf("") }
     val transcriptState = remember { mutableStateOf("") }
+    val moodState = remember { mutableStateOf(3f) }
+
     val isRecording = remember { mutableStateOf(false) }
     val recordedFile = remember { mutableStateOf<File?>(null) }
     val status = remember { mutableStateOf("") }
+    val saving = remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) {
@@ -65,9 +71,29 @@ fun RecordDreamScreen(onBack: () -> Unit) {
         Text(text = "Новый сон", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(onClick = {
-            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = titleState.value,
+            onValueChange = { titleState.value = it },
+            label = { Text("Название (необязательно)") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Настроение: ${'$'}{moodState.value.toInt()}")
+        }
+        Slider(
+            value = moodState.value,
+            onValueChange = { moodState.value = it },
+            valueRange = 1f..5f,
+            steps = 3,
+            colors = SliderDefaults.colors()
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(onClick = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }, modifier = Modifier.fillMaxWidth()) {
             Text("Запросить доступ к микрофону")
         }
 
@@ -112,18 +138,35 @@ fun RecordDreamScreen(onBack: () -> Unit) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(onClick = {
-            CoroutineScope(Dispatchers.IO).launch {
-                val id = repo.saveDream(recordedFile.value?.absolutePath, transcriptState.value)
-                status.value = "Сохранено (#$id). Анализ готов."
-                onBack()
-            }
-        }, modifier = Modifier.fillMaxWidth(), enabled = transcriptState.value.isNotBlank()) {
-            Text("Сохранить и проанализировать")
+        Button(
+            onClick = {
+                saving.value = true
+                status.value = "Сохраняю и анализирую..."
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val id = repo.saveDream(
+                            recordedFile.value?.absolutePath,
+                            transcriptState.value,
+                            title = titleState.value,
+                            moodScore = moodState.value.toInt()
+                        )
+                        status.value = "Сохранено (#${'$'}id). Анализ готов."
+                        onBack()
+                    } finally {
+                        saving.value = false
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !saving.value && transcriptState.value.isNotBlank()
+        ) {
+            Text(if (saving.value) "Анализ..." else "Сохранить и проанализировать")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        if (status.value.isNotBlank()) {
+        if (saving.value) {
+            CircularProgressIndicator()
+        } else if (status.value.isNotBlank()) {
             Text(status.value, style = MaterialTheme.typography.bodyMedium)
         }
     }
