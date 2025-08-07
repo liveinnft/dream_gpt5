@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -28,6 +27,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +57,7 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
 
     var query by remember { mutableStateOf("") }
     var favoritesOnly by remember { mutableStateOf(false) }
+    val expanded = remember { mutableStateMapOf<Long, Boolean>() }
 
     val remindersOn = settings.reminderOnFlow.collectAsState(initial = false)
     val hour = settings.reminderHourFlow.collectAsState(initial = 9)
@@ -139,8 +140,11 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             itemsIndexed(filtered, key = { _, item -> item.id }) { index, dream ->
                 AnimatedVisibility(visible = true, enter = fadeIn() + slideInVertically(initialOffsetY = { it / 8 * index.coerceAtMost(8) })) {
-                    DreamItem(dream,
-                        onClick = { onOpen(dream.id) },
+                    DreamItem(
+                        dream,
+                        expanded = expanded[dream.id] == true,
+                        onCardClick = { expanded[dream.id] = !(expanded[dream.id] ?: false) },
+                        onOpen = { onOpen(dream.id) },
                         onToggleFavorite = { GlobalScope.launch { repo.toggleFavorite(dream.id) } }
                     )
                 }
@@ -150,24 +154,41 @@ fun DreamListScreen(onAddNew: () -> Unit, onOpen: (Long) -> Unit) {
 }
 
 @Composable
-private fun DreamItem(dream: Dream, onClick: () -> Unit, onToggleFavorite: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onClick() }) {
+private fun DreamItem(
+    dream: Dream,
+    expanded: Boolean,
+    onCardClick: () -> Unit,
+    onOpen: () -> Unit,
+    onToggleFavorite: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onCardClick() }) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(text = "#${dream.id} · ${formatEpoch(dream.createdAtEpoch)}", style = MaterialTheme.typography.labelMedium)
-                IconButton(onClick = onToggleFavorite) {
-                    Icon(
-                        painter = painterResource(id = if (dream.isFavorite) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off),
-                        contentDescription = "Избранное"
-                    )
+                Row {
+                    Button(onClick = onOpen) { Text("Открыть") }
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            painter = painterResource(id = if (dream.isFavorite) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off),
+                            contentDescription = "Избранное"
+                        )
+                    }
                 }
             }
             if (dream.title.isNotBlank()) {
                 Text(text = dream.title, style = MaterialTheme.typography.titleMedium)
             }
             Text(text = dream.transcriptText.take(120), style = MaterialTheme.typography.bodyMedium)
-            if (dream.tags.isNotBlank()) {
-                Text(text = "Теги: ${dream.tags}", style = MaterialTheme.typography.bodySmall)
+
+            AnimatedVisibility(visible = expanded) {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    if (dream.summary.isNotBlank()) {
+                        Text(text = "Резюме: ${dream.summary}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (dream.tags.isNotBlank()) {
+                        Text(text = "Теги: ${dream.tags}", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
             }
         }
     }
