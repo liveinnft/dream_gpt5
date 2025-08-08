@@ -1,0 +1,11 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+[remote "origin"]
+	url = https://github.com/liveinnft/dream_gpt5.git
+	fetch = +refs/*:refs/*
+	mirror = true
+[remote "target"]
+	url = git@github.com:liveinnft/dream_app_kt.git
+	fetch = +refs/heads/*:refs/remotes/target/*
