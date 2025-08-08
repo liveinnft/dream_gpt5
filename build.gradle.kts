@@ -1,10 +1,3 @@
 plugins {
-    // No root plugins; applied in modules
-}
-
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
+    // Root build uses settings repositories; no per-project repos here
 }
